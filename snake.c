@@ -18,7 +18,7 @@ typedef struct ISnake {
 } Snake;
 
 int random_position(int max_value){
-    return 10;
+    return rand()%max_value;
 }
 
 void fill_matrix(int height, int width, int matrix[height][width], Position pos_to_fill, int value_to_fill);
@@ -55,6 +55,20 @@ int is_next_food(int height, int width, int matrix[height][width], const Snake *
         return true;
     else
         return false;
+}
+
+void create_new_fruit(int height, int width, int matrix[height][width]){
+    int food_in_safe_place = 0;
+
+    while(!food_in_safe_place){
+        int x = random_position(height);
+        int y = random_position(width);
+
+        if(matrix[x][y] <= 0){
+            matrix[x][y] = -1;
+            food_in_safe_place = 1;
+        }
+    }
 }
 
 
@@ -125,6 +139,8 @@ int main(int argc, char *argv[]) {
             snake.size++;
             Position food_pos = next_position_by_direction(snake.pos_head, snake.direction);
             matrix[food_pos.x][food_pos.y] = snake.size;
+
+            create_new_fruit(height, width, matrix);
         } else {
             move_snake(height, width, matrix, &snake);
         }
