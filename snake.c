@@ -25,7 +25,37 @@ void fill_matrix(int height, int width, int matrix[height][width], Position pos_
 void wprint_matrix(WINDOW *win, int height, int width, int matrix[height][width]);
 WINDOW *create_newwin(int height, int width, int starty, int startx);
 void destroy_win(WINDOW *local_win);
-void new_step_snake(int height, int width, int matrix[height][width], Snake *snake);
+void move_snake(int height, int width, int matrix[height][width], Snake *snake);
+
+Position next_position_by_direction(Position pos, Direction_Snake direction){
+    Position next = pos;
+
+    switch(direction){
+        case UP:
+            next.x--;
+            break;
+        case RIGHT:
+            next.y++;
+            break;
+        case DOWN:
+            next.x++;
+            break;
+        case LEFT:
+            next.y--;
+            break;
+    }
+
+    return next;
+}
+
+int is_next_food(int height, int width, int matrix[height][width], const Snake *snake){
+    Position next_head = next_position_by_direction(snake->pos_head, snake->direction);
+
+    if(matrix[next_head.x][next_head.y] < 0 )
+        return true;
+    else
+        return false;
+}
 
 
 int main(int argc, char *argv[]) {
@@ -53,12 +83,8 @@ int main(int argc, char *argv[]) {
     if(first_food.x == snake.pos_head.x && first_food.y == snake.pos_head.y)
         first_food.y--;
 
-    /* fill_matrix(height, width, matrix, snake.pos_head, snake.size ); */
-
     matrix[snake.pos_head.x][snake.pos_head.y] = snake.size;
     matrix[first_food.x][first_food.y] = -1;
-
-    /* fill_matrix(height, width, matrix, first_food, -1 ); */
 
     // Setup Ncurses
     initscr();            /* Start curses mode 		*/
@@ -82,27 +108,28 @@ int main(int argc, char *argv[]) {
         switch(input){
             case KEY_LEFT:
                 snake.direction = LEFT;
-                new_step_snake(height, width, matrix, &snake);
-                wprint_matrix(display, height, width, matrix);
                 break;
             case KEY_RIGHT:
                 snake.direction = RIGHT;
-                new_step_snake(height, width, matrix, &snake);
-                wprint_matrix(display, height, width, matrix);
                 break;
             case KEY_DOWN:
                 snake.direction = DOWN;
-                new_step_snake(height, width, matrix, &snake);
-                wprint_matrix(display, height, width, matrix);
                 break;
             case KEY_UP:
                 snake.direction = UP;
-                new_step_snake(height, width, matrix, &snake);
-                wprint_matrix(display, height, width, matrix);
                 break;
         }
 
+        int is_food = is_next_food(height, width, matrix, &snake);
+        if(is_food){
+            snake.size++;
+            Position food_pos = next_position_by_direction(snake.pos_head, snake.direction);
+            matrix[food_pos.x][food_pos.y] = snake.size;
+        } else {
+            move_snake(height, width, matrix, &snake);
+        }
 
+        wprint_matrix(display, height, width, matrix);
         box(display, 0, 0);
         wrefresh(display);
     }
@@ -126,7 +153,7 @@ void wprint_matrix(WINDOW *win, int height, int width, int matrix[height][width]
     }
 }
 
-void new_step_snake(int height, int width, int matrix[height][width], Snake *snake){
+void move_snake(int height, int width, int matrix[height][width], Snake *snake){
     Position next_head;
     for(int x = 0; x < height; x++){
         for(int y = 0; y < width; y++){
@@ -136,22 +163,18 @@ void new_step_snake(int height, int width, int matrix[height][width], Snake *sna
                 if(matrix[x][y] == size){
                     switch(snake->direction){
                         case UP:
-                            /* matrix[x-1][y] = size; */
                             snake->pos_head.x = x-1;
                             snake->pos_head.y = y;
                             break;
                         case RIGHT:
-                            /* matrix[x][y+1] = size; */
                             snake->pos_head.x = x;
                             snake->pos_head.y = y+1;
                             break;
                         case DOWN:
-                            /* matrix[x+1][y] = size; */
                             snake->pos_head.x = x+1;
                             snake->pos_head.y = y;
                             break;
                         case LEFT:
-                            /* matrix[x][y-1] = size; */
                             snake->pos_head.x = x;
                             snake->pos_head.y = y-1;
                             break;
