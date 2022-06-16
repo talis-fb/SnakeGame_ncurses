@@ -98,13 +98,20 @@ Position next_position_by_direction(Position pos, Direction_Snake direction){
     return next;
 }
 
-int is_next_food(int height, int width, int matrix[height][width], const Snake *snake){
-    Position next_head = next_position_by_direction(snake->pos_head, snake->direction);
+int is_food(Position pos, int height, int width, int matrix[height][width]){
+    // TRUE: É comida
+    if(matrix[pos.x][pos.y] == -1 )
+        return 1;
 
-    if(matrix[next_head.x][next_head.y] < 0 )
-        return true;
-    else
-        return false;
+    // Se for um pedaço da cobra
+    if(matrix[pos.x][pos.y] > 0 )
+        return -2;
+
+    if(pos.x < 0 || pos.x >= height) return -1;
+    if(pos.y < 0 || pos.y >= width) return -1;
+
+    // Espaço vazio
+    return 0;
 }
 
 void create_new_fruit(int height, int width, int matrix[height][width]){
@@ -201,11 +208,20 @@ int main(int argc, char *argv[]) {
     pthread_create(&input_thread, NULL, read_input, NULL);
 
     while (input != KEY_F(1)) {
-        int is_food = is_next_food(height, width, matrix, &snake);
-        if(is_food){
+        Position next_position = next_position_by_direction(snake.pos_head, snake.direction);
+        int is_new_step_food = is_food(next_position, height, width, matrix);
+
+        if(is_new_step_food < 0 && snake.direction != NONE){
+            printw("GAME OVER");
+            refresh();
+            break;
+        }
+
+        if(is_new_step_food > 0){
             snake.size++;
             Position food_pos = next_position_by_direction(snake.pos_head, snake.direction);
             matrix[food_pos.x][food_pos.y] = snake.size;
+            snake.pos_head = food_pos;
 
             create_new_fruit(height, width, matrix);
         } else {
@@ -213,6 +229,8 @@ int main(int argc, char *argv[]) {
         }
 
         wprint_matrix(display, height, width, matrix);
+
+        // TODO: a box está pegando as bordas
         box(display, 0, 0);
         wrefresh(display);
 
@@ -228,7 +246,7 @@ void wprint_matrix(WINDOW *win, int height, int width, int matrix[height][width]
         for(int y = 0; y < width; y++){
             int value = matrix[x][y];
             if(value < 0){
-                mvwaddch(win, x, y, 'K' | COLOR_PAIR(2) | A_UNDERLINE);
+                mvwaddch(win, x, y, 'X' | COLOR_PAIR(2) | A_UNDERLINE);
             }
             if(value == 0){
                 mvwprintw(win, x, y, " " );
