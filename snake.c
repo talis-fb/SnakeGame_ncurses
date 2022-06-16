@@ -1,7 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
+
+/* #include <time.h> */
+#include <unistd.h>
+
 #include <ncurses.h>
 
+// Types
 typedef struct IPosition { 
     int x;
     int y;
@@ -17,15 +23,59 @@ typedef struct ISnake {
     Direction_Snake direction;
 } Snake;
 
+// Utils
 int random_position(int max_value){
     return rand()%max_value;
 }
 
-void fill_matrix(int height, int width, int matrix[height][width], Position pos_to_fill, int value_to_fill);
+// Methods to handle Matrix
+void fill_matrix(int height, int width, int matrix[height][width], Position pos_to_fill, int value_to_fill){
+    matrix[pos_to_fill.x][pos_to_fill.y] = value_to_fill;
+}
+
+
+// Methods to handle Windows
 void wprint_matrix(WINDOW *win, int height, int width, int matrix[height][width]);
-WINDOW *create_newwin(int height, int width, int starty, int startx);
 void destroy_win(WINDOW *local_win);
-void move_snake(int height, int width, int matrix[height][width], Snake *snake);
+
+// Methods to handle Snake
+void move_snake(int height, int width, int matrix[height][width], Snake *snake){
+    Position next_head;
+    for(int x = 0; x < height; x++){
+        for(int y = 0; y < width; y++){
+            if(matrix[x][y] > 0) {
+                // Se for a cabeça preenche o campo correspondente à direcao atual
+                int size = snake->size;
+                if(matrix[x][y] == size){
+                    switch(snake->direction){
+                        case UP:
+                            snake->pos_head.x = x-1;
+                            snake->pos_head.y = y;
+                            break;
+                        case RIGHT:
+                            snake->pos_head.x = x;
+                            snake->pos_head.y = y+1;
+                            break;
+                        case DOWN:
+                            snake->pos_head.x = x+1;
+                            snake->pos_head.y = y;
+                            break;
+                        case LEFT:
+                            snake->pos_head.x = x;
+                            snake->pos_head.y = y-1;
+                            break;
+                    }
+
+                    next_head = snake->pos_head;
+                }
+
+                matrix[x][y]--;
+            }
+        }
+    }
+    matrix[next_head.x][next_head.y] = snake->size;
+}
+
 
 Position next_position_by_direction(Position pos, Direction_Snake direction){
     Position next = pos;
@@ -71,8 +121,34 @@ void create_new_fruit(int height, int width, int matrix[height][width]){
     }
 }
 
+static int input;
+static Snake snake;
+
+void* read_input(void *args){
+    while(true){
+        input = getch();
+        switch(input){
+            case KEY_LEFT:
+                snake.direction = LEFT;
+                break;
+            case KEY_RIGHT:
+                snake.direction = RIGHT;
+                break;
+            case KEY_DOWN:
+                snake.direction = DOWN;
+                break;
+            case KEY_UP:
+                snake.direction = UP;
+                break;
+        }
+    }
+
+    return NULL;
+}
 
 int main(int argc, char *argv[]) {
+    srand(time(NULL));
+
     // Setup Game Variables
     int width = 30, height=30;
     int matrix[height][width];
@@ -83,8 +159,6 @@ int main(int argc, char *argv[]) {
             matrix[i][j] = 0;
 
     int initial_size_snake = 3;
-
-    Snake snake;
     snake.size = initial_size_snake;
     snake.pos_head.x = random_position(height);
     snake.pos_head.y = random_position(width);
@@ -106,10 +180,15 @@ int main(int argc, char *argv[]) {
                            * everty thing to me 		*/
     keypad(stdscr, TRUE); /* I need that nifty F1 	*/
 
+    noecho();
+
     int starty = (LINES - height) / 2; /* Calculating for a center placement */
     int startx = (COLS - width) / 2;   /* of the window		*/
 
+    attron(A_BOLD);
     printw("Pressiona F1 para sair");
+    attroff(A_BOLD);
+
     refresh(); // Por algum motivo isso é obrigatorio
 
     WINDOW *display;
@@ -117,23 +196,11 @@ int main(int argc, char *argv[]) {
     box(display, 0, 0);
     wrefresh(display);
 
-    int input;
-    while ((input = getch()) != KEY_F(1)) {
-        switch(input){
-            case KEY_LEFT:
-                snake.direction = LEFT;
-                break;
-            case KEY_RIGHT:
-                snake.direction = RIGHT;
-                break;
-            case KEY_DOWN:
-                snake.direction = DOWN;
-                break;
-            case KEY_UP:
-                snake.direction = UP;
-                break;
-        }
+    // Start thread just to 
+    pthread_t input_thread;
+    pthread_create(&input_thread, NULL, read_input, NULL);
 
+    while (input != KEY_F(1)) {
         int is_food = is_next_food(height, width, matrix, &snake);
         if(is_food){
             snake.size++;
@@ -148,87 +215,30 @@ int main(int argc, char *argv[]) {
         wprint_matrix(display, height, width, matrix);
         box(display, 0, 0);
         wrefresh(display);
+
+        usleep(80000);
     }
 
     endwin(); /* End curses mode		  */
     return 0;
 }
 
-void fill_matrix(int height, int width, int matrix[height][width], Position pos_to_fill, int value_to_fill){
-    matrix[pos_to_fill.x][pos_to_fill.y] = value_to_fill;
-}
-
 void wprint_matrix(WINDOW *win, int height, int width, int matrix[height][width]){
     for(int x = 0; x < height; x++){
         for(int y = 0; y < width; y++){
             int value = matrix[x][y];
-            if(value < 0) mvwprintw(win, x, y, "X" );
-            if(value == 0) mvwprintw(win, x, y, " " );
-            if(value > 0) mvwprintw(win, x, y, "O" );
-        }
-    }
-}
-
-void move_snake(int height, int width, int matrix[height][width], Snake *snake){
-    Position next_head;
-    for(int x = 0; x < height; x++){
-        for(int y = 0; y < width; y++){
-            if(matrix[x][y] > 0) {
-                // Se for a cabeça preenche o campo correspondente à direcao atual
-                int size = snake->size;
-                if(matrix[x][y] == size){
-                    switch(snake->direction){
-                        case UP:
-                            snake->pos_head.x = x-1;
-                            snake->pos_head.y = y;
-                            break;
-                        case RIGHT:
-                            snake->pos_head.x = x;
-                            snake->pos_head.y = y+1;
-                            break;
-                        case DOWN:
-                            snake->pos_head.x = x+1;
-                            snake->pos_head.y = y;
-                            break;
-                        case LEFT:
-                            snake->pos_head.x = x;
-                            snake->pos_head.y = y-1;
-                            break;
-                    }
-
-                    next_head = snake->pos_head;
-                }
-
-                matrix[x][y]--;
+            if(value < 0){
+                mvwaddch(win, x, y, 'K' | COLOR_PAIR(2) | A_UNDERLINE);
+            }
+            if(value == 0){
+                mvwprintw(win, x, y, " " );
+            }
+            if(value > 0) {
+                mvwprintw(win, x, y, "O" );
             }
         }
     }
-    matrix[next_head.x][next_head.y] = snake->size;
 }
-
-/* int isEat(Position pos){ */
-/*     if(pos < 0 ) */
-/*         return 1; */
-/*     return 0; */
-/* } */
-
-/* void eat_food_snake(int height, int width, int matrix[height][width]){ */
-/*     for(int x = 0; x < height; x++){ */
-/*         for(int y = 0; y < height; y++){ */
-/*             int value = matrix[x][y]; */
-/*             if(value < 0) mvwprintw(win, y, x, "X" ); */
-/*             if(value == 0) mvwprintw(win, y, x, " " ); */
-/*             if(value > 0) mvwprintw(win, y, x, "O" ); */
-/*         } */
-/*     } */
-/* } */
-
-
-
-
-
-
-
 
 
 void destroy_win(WINDOW *local_win) {
