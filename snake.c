@@ -38,6 +38,30 @@ void fill_matrix(int height, int width, int matrix[height][width], Position pos_
 void wprint_matrix(WINDOW *win, int height, int width, int matrix[height][width]);
 void destroy_win(WINDOW *local_win);
 
+void game_over_screen(){
+    clear();
+    /* printw(" ▄▄▄▄▄▄▄ ▄▄▄▄▄▄▄ ▄▄   ▄▄ ▄▄▄▄▄▄▄    ▄▄▄▄▄▄▄ ▄▄   ▄▄ ▄▄▄▄▄▄▄ ▄▄▄▄▄▄"); */
+    /* printw("█       █       █  █▄█  █       █  █       █  █ █  █       █   ▄  █"); */
+    /* printw("█   ▄▄▄▄█   ▄   █       █    ▄▄▄█  █   ▄   █  █▄█  █    ▄▄▄█  █ █ █"); */
+    /* printw("█  █  ▄▄█  █▄█  █       █   █▄▄▄   █  █ █  █       █   █▄▄▄█   █▄▄█▄"); */
+    /* printw("█  █ █  █       █       █    ▄▄▄█  █  █▄█  █       █    ▄▄▄█    ▄▄  █"); */
+    /* printw("█  █▄▄█ █   ▄   █ ██▄██ █   █▄▄▄   █       ██     ██   █▄▄▄█   █  █ █"); */
+    /* printw("█▄▄▄▄▄▄▄█▄▄█ █▄▄█▄█   █▄█▄▄▄▄▄▄▄█  █▄▄▄▄▄▄▄█ █▄▄▄█ █▄▄▄▄▄▄▄█▄▄▄█  █▄█"); */
+
+    int y = (COLS - 60) / 2;
+    int x = (LINES - 6) / 2;
+
+    mvprintw(x,y,  "################################################################");
+    mvprintw(x+1,y,"################################################################");
+    mvprintw(x+2,y,"###############          GAME OVER          ####################");
+    mvprintw(x+3,y,"################################################################");
+    mvprintw(x+4,y,"################################################################");
+    mvprintw(x+5,y,"");
+    mvprintw(x+6,y,"          < Pressiona qualquer tecla para sair >");
+
+    refresh();
+}
+
 // Methods to handle Snake
 void move_snake(int height, int width, int matrix[height][width], Snake *snake){
     Position next_head;
@@ -121,9 +145,11 @@ void create_new_fruit(int height, int width, int matrix[height][width]){
         int x = random_position(height);
         int y = random_position(width);
 
-        if(matrix[x][y] <= 0){
-            matrix[x][y] = -1;
-            food_in_safe_place = 1;
+        if( (0 <= x) && (x < height) && (0 <= y) && (y < width) ){
+            if(matrix[x][y] == 0){
+                matrix[x][y] = -1;
+                food_in_safe_place = 1;
+            }
         }
     }
 }
@@ -131,9 +157,10 @@ void create_new_fruit(int height, int width, int matrix[height][width]){
 static int input;
 static Snake snake;
 
+static int game_is_over = 0;
+
 void* read_input(void *args){
-    while(true){
-        input = getch();
+    while((input = getch()) && !game_is_over){
         switch(input){
             case KEY_LEFT:
                 snake.direction = LEFT;
@@ -212,8 +239,18 @@ int main(int argc, char *argv[]) {
         int is_new_step_food = is_food(next_position, height, width, matrix);
 
         if(is_new_step_food < 0 && snake.direction != NONE){
-            printw("GAME OVER");
+            // Destroi o grid do jogo e imprime a tela de game over
+            destroy_win(display);
+            clear();
+            game_over_screen();
             refresh();
+
+            // Seta a variavel para encerrar o loop da outra thread e espera ela encerrar
+            // como ela tá travada para receber o input do usuario, ela já serve como o ultimo input
+            // mencionado na tela de game over
+            game_is_over = 1;
+            pthread_join(input_thread, NULL);
+
             break;
         }
 
