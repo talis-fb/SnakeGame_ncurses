@@ -12,4 +12,6 @@ Dependências: `gcc`, `make` e a biblioteca `ncurses`
 
 ---
 
+## Screenshots
+
 ![App Screenshot](./preview.GIF)
