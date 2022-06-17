@@ -104,20 +104,10 @@ void move_snake(int height, int width, int matrix[height][width], Snake *snake){
 Position next_position_by_direction(Position pos, Direction_Snake direction){
     Position next = pos;
 
-    switch(direction){
-        case UP:
-            next.x--;
-            break;
-        case RIGHT:
-            next.y++;
-            break;
-        case DOWN:
-            next.x++;
-            break;
-        case LEFT:
-            next.y--;
-            break;
-    }
+    if(direction == UP) next.x--;
+    if(direction == DOWN) next.x++;
+    if(direction == RIGHT) next.y++;
+    if(direction == LEFT) next.y--;
 
     return next;
 }
@@ -158,20 +148,25 @@ static int input;
 static Snake snake;
 
 static int game_is_over = 0;
+static int score = 0;
 
 void* read_input(void *args){
     while((input = getch()) && !game_is_over){
         switch(input){
             case KEY_LEFT:
+            case 'a':
                 snake.direction = LEFT;
                 break;
             case KEY_RIGHT:
+            case 'd':
                 snake.direction = RIGHT;
                 break;
             case KEY_DOWN:
+            case 's':
                 snake.direction = DOWN;
                 break;
             case KEY_UP:
+            case 'w':
                 snake.direction = UP;
                 break;
         }
@@ -183,16 +178,54 @@ void* read_input(void *args){
 int main(int argc, char *argv[]) {
     srand(time(NULL));
 
+    // Setup Ncurses
+    initscr();            /* Start curses mode 		*/
+    cbreak();             /* Line buffering disabled, Pass on everty thing to me 		*/
+    keypad(stdscr, TRUE); /* I need that nifty F1 	*/
+
+    // Print difilculdade choice
+    mvprintw(10, 10, "Bem-vindo ao SNAKE GAME");
+    mvprintw(11, 10, "(0) \"Mamae, posso jogar?\"");
+    mvprintw(12, 10, "(1) Facil");
+    mvprintw(13, 10, "(2) Medio");
+    mvprintw(14, 10, "(3) Dificil");
+    mvprintw(15, 10, "(4) Manda a braba!");
+    mvprintw(16, 10, " > ");
+    refresh();
+
+    // get choice e 
+    char d[5];
+    getstr(d);
+    int dificuldade_selecionada = atoi(d);
+
+    // Agr nao printa mais oq o cara escreve
+    noecho();
+
     // Setup Game Variables
-    int width = 30, height=30;
+    int width = (5 * dificuldade_selecionada) + 10;
+    int height = (5 * dificuldade_selecionada) + 10;
+    int initial_size_snake = ( dificuldade_selecionada < 2 ) ? 5 : 3;
+    int speed = 100000 - ( dificuldade_selecionada * 10000 ) ;
+
+    /* int y = (COLS - 60) / 2; */
+    /* int x = (LINES - 6) / 2; */
+
     int matrix[height][width];
+
+    // Setup GRID
+    int starty = (LINES - height) / 2; /* Calculating for a center placement */
+    int startx = (COLS - width) / 2;   /* of the window		*/
+
+    WINDOW *display;
+    display = newwin(height, width, starty, startx);
+    wborder(display, '|', '|', '-', '-', '+', '+', '+', '+');
+    wrefresh(display);
 
     // Reset all field of matrix
     for(int i = 0; i < height; i++)
         for(int j = 0; j < height; j++)
             matrix[i][j] = 0;
 
-    int initial_size_snake = 3;
     snake.size = initial_size_snake;
     snake.pos_head.x = random_position(height);
     snake.pos_head.y = random_position(width);
@@ -208,28 +241,6 @@ int main(int argc, char *argv[]) {
     matrix[snake.pos_head.x][snake.pos_head.y] = snake.size;
     matrix[first_food.x][first_food.y] = -1;
 
-    // Setup Ncurses
-    initscr();            /* Start curses mode 		*/
-    cbreak();             /* Line buffering disabled, Pass on
-                           * everty thing to me 		*/
-    keypad(stdscr, TRUE); /* I need that nifty F1 	*/
-
-    noecho();
-
-    int starty = (LINES - height) / 2; /* Calculating for a center placement */
-    int startx = (COLS - width) / 2;   /* of the window		*/
-
-    attron(A_BOLD);
-    printw("Pressiona F1 para sair");
-    attroff(A_BOLD);
-
-    refresh(); // Por algum motivo isso é obrigatorio
-
-    WINDOW *display;
-    display = newwin(height, width, starty, startx);
-    box(display, 0, 0);
-    wrefresh(display);
-
     // Start thread just to 
     pthread_t input_thread;
     pthread_create(&input_thread, NULL, read_input, NULL);
@@ -238,6 +249,7 @@ int main(int argc, char *argv[]) {
         Position next_position = next_position_by_direction(snake.pos_head, snake.direction);
         int is_new_step_food = is_food(next_position, height, width, matrix);
 
+        // END GAME
         if(is_new_step_food < 0 && snake.direction != NONE){
             // Destroi o grid do jogo e imprime a tela de game over
             destroy_win(display);
@@ -254,12 +266,12 @@ int main(int argc, char *argv[]) {
             break;
         }
 
+        // IF NEXT STEP IS A FRUIT
         if(is_new_step_food > 0){
             snake.size++;
             Position food_pos = next_position_by_direction(snake.pos_head, snake.direction);
             matrix[food_pos.x][food_pos.y] = snake.size;
             snake.pos_head = food_pos;
-
             create_new_fruit(height, width, matrix);
         } else {
             move_snake(height, width, matrix, &snake);
@@ -268,10 +280,9 @@ int main(int argc, char *argv[]) {
         wprint_matrix(display, height, width, matrix);
 
         // TODO: a box está pegando as bordas
-        box(display, 0, 0);
+        wborder(display, '|', '|', '-', '-', '+', '+', '+', '+');
         wrefresh(display);
-
-        usleep(80000);
+        usleep(speed);
     }
 
     endwin(); /* End curses mode		  */
