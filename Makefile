@@ -1,2 +1,2 @@
-ncurses:
-	gcc ncurses1.c -o program -Wall -lncurses
+run: main.c
+	gcc main.c -o program -Wall -lncurses && ./program
